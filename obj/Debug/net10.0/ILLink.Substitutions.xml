@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<linker>
+  <assembly fullname="FunWithFSharp">
+    <resource name="FSharpSignatureData.FunWithFSharp" action="remove"></resource>
+    <resource name="FSharpSignatureCompressedData.FunWithFSharp" action="remove"></resource>
+    <resource name="FSharpSignatureDataB.FunWithFSharp" action="remove"></resource>
+    <resource name="FSharpSignatureCompressedDataB.FunWithFSharp" action="remove"></resource>
+    <resource name="FSharpOptimizationData.FunWithFSharp" action="remove"></resource>
+    <resource name="FSharpOptimizationCompressedData.FunWithFSharp" action="remove"></resource>
+    <resource name="FSharpOptimizationDataB.FunWithFSharp" action="remove"></resource>
+    <resource name="FSharpOptimizationCompressedDataB.FunWithFSharp" action="remove"></resource>
+    <resource name="FSharpOptimizationInfo.FunWithFSharp" action="remove"></resource>
+    <resource name="FSharpSignatureInfo.FunWithFSharp" action="remove"></resource>
+  </assembly>
+</linker>
