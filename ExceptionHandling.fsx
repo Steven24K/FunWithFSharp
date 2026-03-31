@@ -11,6 +11,10 @@ let map f maybe =
     match maybe with
     | Some x -> f x |> Some
     | None -> None
+let bind f result = 
+    match result with 
+    | Some x -> f x
+    | _ -> None
 
 let _some a = Some a 
 let _none = None
@@ -33,18 +37,24 @@ let tryDivide x y =
 // Or use the Result type build in, Success or Failure
 
 // Maybe a start on Fold logic, but lets wait until we move to recursion
-let extractMaybe a = 
+let visit onSome onNone a = 
     match a with 
-        | Some a -> a.ToString()
-        | None -> "None"
+        | Some a -> onSome(a)
+        | None -> onNone()
 
-let q1 = tryDivide 4 2 |> extractMaybe
-let q2 = tryDivide 4 0 |> extractMaybe
+let toString = fun a -> a.ToString()
+let Id =  fun () -> "<Empty>"
+let q1 = tryDivide 4 2 |> visit toString Id
+let q2 = tryDivide 4 0 |> visit toString Id
 printfn $"{q1}"
 printfn $"{q2}"
 
-let isDate = tryParseDateTime "2019-08-01" |> extractMaybe
-let isNotDate = tryParseDateTime "Hello" |> extractMaybe
+let month_progress = "2026-09-03" |> tryParseDateTime |> bind (fun d -> tryDivide d.Month d.Day) |> visit toString Id
+
+printfn $"Month Progress: {month_progress}"
+
+let isDate = tryParseDateTime "2019-08-01" |> visit toString Id
+let isNotDate = tryParseDateTime "Hello" |> visit toString Id
 
 printfn $"{isDate}"
 printfn $"{isNotDate}"
