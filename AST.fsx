@@ -12,6 +12,7 @@ type Expression =
     | PRINT of string
 
 type Error = string 
+type Return = int
 
 type Program = list<Expression>
 
@@ -21,9 +22,11 @@ type Either<'a, 'b> =
     | Left of 'a
     | Right of 'b
 
-// TODO: Also store Stack together with error
-// or Type ExecutionResult = Stack * Either<Error, int>
-type ExecutionResult = Either<Error, Stack * int>
+type ExecutionResult =  Stack * Either<Error, Return>
+
+let mapFst f (a, b) = (f a, b)
+let mapSnd f (a, b) = (a, f b)
+let mapFull f1 f2 (a, b) = (f1 a, f2 b)
 
 let inL<'a, 'b>(v: 'a): Either<'a, 'b> = Left v  
 let inR<'a, 'b>(v: 'b): Either<'a, 'b> = Right v  
@@ -40,37 +43,45 @@ let bindL f result =
 
 let printOut (r: ExecutionResult): ExecutionResult = 
     let pretty_string = 
-        match r with 
-        | Right (_, output) -> $"{output}" 
-        | Left e -> $"ERROR: {e}"
+        let stack, result  = r
+        match result with 
+        | Right output -> $"{output}" 
+        | Left e -> $"ERROR: {e} Stack: {stack}"
     pretty_string |> printfn "%A"
     r
 
 let rec exec (stack: Stack)(exp: Expression): ExecutionResult = 
     match exp with 
     | SET (k, v) -> 
-        (stack.Add(k, v), v) |> inR
-    | VAL (v: int) -> (stack, v) |> inR
+        stack.Add(k, v), v |> inR
+    | VAL (v: int) -> stack, v |> inR
     | VAR k -> 
-        if stack.ContainsKey k then (stack, stack.[k]) |> inR else $"var {k} does not exists" |> inL
+        stack, if stack.ContainsKey k then stack.[k] |> inR else $"var {k} does not exists" |> inL
     | ASSIGN (k, e) -> 
-        exec stack e |> bindR (fun (s1, v) -> (s1.Add(k, v), v) |> inR)
+        exec stack e // TODO: Store Assignments in different stack for expressions and call by need
     | PRINT k -> 
-        exec stack (VAR k) |> printOut |> bindR (fun (s1, v) -> (s1, v) |> inR)
+        exec stack (VAR k) |> printOut
     | ADD (e1, e2) -> 
-        exec stack e1 |> bindR (fun (s1, v1) -> exec s1 e2 |> bindR (fun (s2, v2) ->  (s2, v1 + v2) |> inR))
+        let s1, res1 = exec stack e1
+        let s2, res2 = exec s1 e2
+        s2, res1 |> bindR (fun v1 -> res2 |> bindR (fun v2 ->  v1 + v2 |> inR))
     | SUB (e1, e2) -> 
-        exec stack e1 |> bindR (fun (s1, v1) -> exec s1 e2 |> bindR (fun (s2, v2) ->  (s2, v1 - v2) |> inR))
+        let s1, res1 = exec stack e1
+        let s2, res2 = exec s1 e2
+        s2, res1 |> bindR (fun v1 -> res2 |> bindR (fun v2 ->  v1 - v2 |> inR))
     | MUL (e1, e2) -> 
-        exec stack e1 |> bindR (fun (s1, v1) -> exec s1 e2 |> bindR (fun (s2, v2) ->  (s2, v1 * v2) |> inR))
+        let s1, res1 = exec stack e1
+        let s2, res2 = exec s1 e2
+        s2, res1 |> bindR (fun v1 -> res2 |> bindR (fun v2 ->  v1 * v2 |> inR))
     | DIV (e1, e2) -> 
-        exec stack e1 |> bindR (fun (s1, v1) -> exec s1 e2 |> bindR (fun (s2, v2) ->  if v2 = 0 then $"Cannot divide {v1} by 0" |> inL |> printOut else (s2, v1 / v2) |> inR))
+        let s1, res1 = exec stack e1
+        let s2, res2 = exec s1 e2
+        s2, res1 |> bindR (fun v1 -> res2 |> bindR (fun v2 ->  v1 / v2 |> inR))
 
 let run (program: Program): ExecutionResult =
     program 
-    |> List.fold (fun (s1: ExecutionResult) exp -> 
-        s1 |> bindR (fun (s2, _) -> exec s2 exp)) 
-        ((Map.empty, 0) |> inR)
+    |> List.fold(fun (s, res) exp -> exec s exp )
+        (Map.empty, 0 |> inR)
         
 
 let program: Program = [
