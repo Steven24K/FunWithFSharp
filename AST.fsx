@@ -1,28 +1,57 @@
-// TODO: Make support for strings and booleans
+type Primitive = 
+    | INT of int
+    | STR of string
+    | BOOL of bool
+
+// TODO: Catch this with Either as well
+let add (t: Primitive*Primitive) = 
+    match t with
+    | INT a, INT b -> INT(a + b)
+    | STR a, STR b -> STR $"{a}{b}"
+    | BOOL a, BOOL b -> BOOL (a && b)
+    | a, b -> STR $"Cannot apply + on {a} and {b}" 
+
+let sub (t: Primitive*Primitive) = 
+    match t with
+    | INT a, INT b -> INT(a - b)
+    | STR a, STR b -> STR (a.Replace(b, ""))
+    | BOOL a, BOOL b -> BOOL (a || b)
+    | a, b -> STR $"Cannot apply - on {a} and {b}" 
+
+let mul (t: Primitive*Primitive) = 
+    match t with
+    | INT a, INT b -> INT(a * b)
+    | a, b -> STR $"Cannot apply * on {a} and {b}" 
+
+let div (t: Primitive*Primitive) = 
+    match t with
+    | INT a, INT b -> INT(a / b)
+    | a, b -> STR $"Cannot apply / on {a} and {b}" 
 
 type Expression =
-    | SET of string * int
-    | VAL of int
+    | VAL of Primitive
+    | SET of string * Primitive
     | VAR of string
-    | ASSIGN of string * Expression
     | ADD of Expression * Expression
     | SUB of Expression * Expression
     | MUL of Expression * Expression
     | DIV of Expression * Expression
     | PRINT of string
 
+// TODO: Add expressions to this type to support lazy evaluation
+type ValueResult = Primitive
+// TODO: Add more errors for better exception handling
 type Error = string 
-type Return = int
+
+type Stack = Map<string, ValueResult>
 
 type Program = list<Expression>
-
-type Stack = Map<string, int>
-
 type Either<'a, 'b> = 
     | Left of 'a
     | Right of 'b
 
-type ExecutionResult =  Stack * Either<Error, Return>
+// Product of Stack with Sum of Error and Result = [Stack, |Error|Result|]
+type ExecutionStack =  Stack * Either<Error, ValueResult>
 
 let mapFst f (a, b) = (f a, b)
 let mapSnd f (a, b) = (a, f b)
@@ -41,7 +70,7 @@ let bindL f result =
     | Left x -> f x
     | Right x -> inR x
 
-let printOut (r: ExecutionResult): ExecutionResult = 
+let printOut (r: ExecutionStack): ExecutionStack = 
     let pretty_string = 
         let stack, result  = r
         match result with 
@@ -50,53 +79,53 @@ let printOut (r: ExecutionResult): ExecutionResult =
     pretty_string |> printfn "%A"
     r
 
-let rec exec (stack: Stack)(exp: Expression): ExecutionResult = 
+let rec exec (stack: Stack)(exp: Expression): ExecutionStack = 
     match exp with 
+    | VAL v 
+        -> stack, v |> inR
     | SET (k, v) -> 
         stack.Add(k, v), v |> inR
-    | VAL (v: int) -> stack, v |> inR
     | VAR k -> 
         stack, if stack.ContainsKey k then stack.[k] |> inR else $"var {k} does not exists" |> inL
-    | ASSIGN (k, e) -> 
-        exec stack e // TODO: Store Assignments in different stack for expressions and call by need
-    | PRINT k -> 
-        exec stack (VAR k) |> printOut
     | ADD (e1, e2) -> 
         let s1, res1 = exec stack e1
         let s2, res2 = exec s1 e2
-        s2, res1 |> bindR (fun v1 -> res2 |> bindR (fun v2 ->  v1 + v2 |> inR))
+        s2, res1 |> bindR (fun v1 -> res2 |> bindR (fun v2 -> add(v1, v2) |> inR))
     | SUB (e1, e2) -> 
         let s1, res1 = exec stack e1
         let s2, res2 = exec s1 e2
-        s2, res1 |> bindR (fun v1 -> res2 |> bindR (fun v2 ->  v1 - v2 |> inR))
+        s2, res1 |> bindR (fun v1 -> res2 |> bindR (fun v2 -> sub(v1, v2) |> inR))
     | MUL (e1, e2) -> 
         let s1, res1 = exec stack e1
         let s2, res2 = exec s1 e2
-        s2, res1 |> bindR (fun v1 -> res2 |> bindR (fun v2 ->  v1 * v2 |> inR))
+        s2, res1 |> bindR (fun v1 -> res2 |> bindR (fun v2 -> mul(v1, v2) |> inR))
     | DIV (e1, e2) -> 
         let s1, res1 = exec stack e1
         let s2, res2 = exec s1 e2
-        s2, res1 |> bindR (fun v1 -> res2 |> bindR (fun v2 ->  v1 / v2 |> inR))
+        s2, res1 |> bindR (fun v1 -> res2 |> bindR (fun v2 -> div(v1, v2) |> inR))
+    | PRINT k -> 
+        exec stack (VAR k) |> printOut
 
-let run (program: Program): ExecutionResult =
+let run (program: Program): ExecutionStack =
     program 
     |> List.fold(fun (s, res) exp -> exec s exp )
-        (Map.empty, 0 |> inR)
+        (Map.empty, INT 0 |> inR)
         
 
 let program: Program = [
-    SET ("x", 4);
-    SET ("y", 5);
-    ASSIGN ("result", ADD (VAR "x", VAR "y"));
-    ASSIGN ("q", DIV (VAL 8, VAL 2));
+    SET ("msg", STR "Hello World")
+    SET ("x", INT 4);
+    SET ("y", INT 5);
+    // SET ("q", DIV (VAL 8, VAL 2));
+
+    PRINT "msg"
     PRINT "x"
     PRINT "y"
-    PRINT "result"
     PRINT "q"
 
     // something = 8(4 + 6) - (4 / 2) = 78
-    ASSIGN("something", SUB(MUL(ADD (VAL 4, VAL 6), VAL 8), DIV (VAL 4, VAL 2)))
-    PRINT "something"
+    // SET("something", SUB(MUL(ADD (VAL 4, VAL 6), VAL 8), DIV (VAL 4, VAL 2)))
+    // PRINT "something"
 ]
 
 run program
